@@ -5,7 +5,12 @@ from datetime import datetime, timezone, timedelta
 
 app = FastAPI()
 
-# আপনার সেই ২৬+ পেয়ারের লিস্ট
+OWNER_INFO = {
+    "Owner_Developer": "DARK-X-RAYHAN",
+    "Telegram": "@mdrayhan85"
+}
+
+# আপনার সেই ২৬+ নির্দিষ্ট OTC পেয়ারের লিস্ট
 ALLOWED_PAIRS = [
     "AUDCAD_otc", "AUDCHF_otc", "AUDJPY_otc", "AUDNZD_otc", "AUDUSD_otc",
     "CADCHF_otc", "CADJPY_otc", "CHFJPY_otc", "EURAUD_otc", "EURCAD_otc",
@@ -15,7 +20,7 @@ ALLOWED_PAIRS = [
     "USDCAD_otc", "USDCHF_otc", "USDJPY_otc", "USDBDT_otc", "USDINR_otc"
 ]
 
-# আপনার লেটেস্ট কনসোল কুকি ও ইউজার এজেন্ট
+# আপনার কনসোল থেকে পাওয়া লেটেস্ট ডাটা
 COOKIES = {
     "lang": "en",
     "_ga": "GA1.1.453634495.1773337729",
@@ -31,24 +36,29 @@ HEADERS = {
     "Referer": "https://qxbroker.com/en/demo-trade"
 }
 
-# --- প্রক্সি সেটিংস ---
-# এখানে আপনার প্রক্সি আইপি এবং পোর্ট বসান (উদাহরণ স্বরূপ নিচে একটি দেওয়া হলো)
+# --- প্রক্সি সেটিংস (কাজ না করলে শুধু IP:PORT পরিবর্তন করবেন) ---
+proxy_url = "http://67.201.33.10:25283" 
+
 PROXIES = {
-    "http": "http://username:password@proxy_ip:port",
-    "https": "http://username:password@proxy_ip:port"
+    "http": proxy_url,
+    "https": proxy_url
 }
+
+@app.get("/")
+def home():
+    return {"status": "Active", "owner": "DARK-X-RAYHAN", "proxy_status": "Enabled"}
 
 @app.get("/api/candles")
 async def get_candles(pair: str = "USDBDT_otc", count: int = 10):
     if pair not in ALLOWED_PAIRS:
-        return {"success": False, "message": "Invalid Pair"}
+        return {"success": False, "message": f"Pair {pair} is not in allowed list."}
 
     try:
         ts = int(time.time())
         url = f"https://qxbroker.com/api/v1/candles-list/{pair}/60/{ts}/{count}"
         
-        # proxies=PROXIES যোগ করা হয়েছে যাতে রেন্ডার সার্ভারের আইপি লুকিয়ে রাখা যায়
-        response = requests.get(url, cookies=COOKIES, headers=HEADERS, proxies=PROXIES, timeout=15)
+        # প্রক্সি এবং কুকি সহ রিকোয়েস্ট
+        response = requests.get(url, cookies=COOKIES, headers=HEADERS, proxies=PROXIES, timeout=20)
         
         if response.status_code == 200 and response.text.strip():
             raw_data = response.json()
@@ -60,14 +70,26 @@ async def get_candles(pair: str = "USDBDT_otc", count: int = 10):
                 processed.append({
                     "id": i + 1,
                     "pair": pair,
-                    "candle_time": datetime.fromtimestamp(c['at'], tz=bd_tz).strftime("%H:%M:00"),
+                    "candle_time": datetime.fromtimestamp(c['at'], tz=bd_tz).strftime("%Y-%m-%d %H:%M:00"),
                     "open": str(o),
+                    "high": str(c.get('high', o)),
+                    "low": str(c.get('low', cl)),
                     "close": str(cl),
                     "color": "green" if cl > o else "red"
                 })
-            return {"success": True, "data": processed}
+            
+            return {
+                **OWNER_INFO,
+                "success": True,
+                "data": processed
+            }
         
-        return {"success": False, "error": "Proxy or Cookies failed", "status": response.status_code}
+        return {
+            "success": False,
+            "error": "Access Denied or Proxy Failed",
+            "status_code": response.status_code,
+            "msg": "Try changing the proxy_url in code."
+        }
 
     except Exception as e:
         return {"success": False, "error": str(e)}
