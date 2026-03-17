@@ -1,4 +1,3 @@
 fastapi
 uvicorn
-python-dotenv
-git+https://github.com/nandofukada/quotexapi.git
+websocket-client
