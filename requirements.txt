@@ -1,4 +1,4 @@
 fastapi
 uvicorn
-quotexapi
 python-dotenv
+git+https://github.com/nandofukada/quotexapi.git
